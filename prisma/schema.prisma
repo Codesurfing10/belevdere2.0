@@ -1,0 +1,120 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model PropertyManager {
+  id           String   @id @default(cuid())
+  name         String
+  email        String
+  phone        String
+  responseSla  Int      @default(24)
+  rating       Float    @default(4.0)
+  serviceAreas String[]
+  bio          String?
+  avatar       String?
+  listings     RentalListing[]
+  createdAt    DateTime @default(now())
+}
+
+model RentalListing {
+  id          String   @id @default(cuid())
+  managerId   String
+  manager     PropertyManager @relation(fields: [managerId], references: [id])
+  title       String
+  description String
+  address     String
+  city        String
+  lat         Float
+  lng         Float
+  nightlyPrice Float
+  cleaningFee  Float   @default(0)
+  serviceFee   Float   @default(0)
+  maxGuests    Int
+  amenities    Json    @default("[]")
+  images       Json    @default("[]")
+  availabilityBlocks AvailabilityBlock[]
+  bookings     Booking[]
+  createdAt    DateTime @default(now())
+}
+
+model AvailabilityBlock {
+  id        String   @id @default(cuid())
+  listingId String
+  listing   RentalListing @relation(fields: [listingId], references: [id])
+  startDate DateTime
+  endDate   DateTime
+  isAvailable Boolean @default(true)
+  createdAt DateTime @default(now())
+}
+
+model Booking {
+  id         String   @id @default(cuid())
+  listingId  String
+  listing    RentalListing @relation(fields: [listingId], references: [id])
+  startDate  DateTime
+  endDate    DateTime
+  guests     Int
+  status     String   @default("hold")
+  totalPrice Float
+  guestName  String?
+  guestEmail String?
+  order      Order?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model CatalogItem {
+  id          String   @id @default(cuid())
+  category    String
+  name        String
+  description String
+  price       Float
+  stockQty    Int      @default(100)
+  imageUrl    String?
+  cartItems   CartItem[]
+  createdAt   DateTime @default(now())
+}
+
+model MealOption {
+  id          String   @id @default(cuid())
+  type        String
+  name        String
+  description String
+  price       Float
+  items       Json     @default("[]")
+  imageUrl    String?
+  cartItems   CartItem[]
+  createdAt   DateTime @default(now())
+}
+
+model Order {
+  id            String   @id @default(cuid())
+  bookingId     String   @unique
+  booking       Booking  @relation(fields: [bookingId], references: [id])
+  cartItems     CartItem[]
+  deliveryWindow String?
+  subtotal      Float
+  total         Float
+  status        String   @default("pending")
+  stripePaymentIntentId String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model CartItem {
+  id           String   @id @default(cuid())
+  orderId      String
+  order        Order    @relation(fields: [orderId], references: [id])
+  catalogItemId String?
+  catalogItem  CatalogItem? @relation(fields: [catalogItemId], references: [id])
+  mealOptionId String?
+  mealOption   MealOption? @relation(fields: [mealOptionId], references: [id])
+  quantity     Int      @default(1)
+  unitPrice    Float
+  createdAt    DateTime @default(now())
+}
