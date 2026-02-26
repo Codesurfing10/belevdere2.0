@@ -1,6 +1,6 @@
 # Belevdere 2.0
 
-A short-term rental matching, booking, and supplies/equipment ordering platform built with Next.js 14.
+A short-term rental matching, booking, and supplies/equipment ordering platform built with Next.js 15.
 
 ## Features
 
@@ -15,7 +15,7 @@ A short-term rental matching, booking, and supplies/equipment ordering platform 
 
 ## Tech Stack
 
-- **Next.js 14** (App Router, TypeScript)
+- **Next.js 15** (App Router, TypeScript)
 - **Prisma + PostgreSQL** — Data model for listings, bookings, orders, catalog
 - **Mapbox** — Map display and geocoding
 - **Stripe** — Payments and webhooks
