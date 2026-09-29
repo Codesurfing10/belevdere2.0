@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 
-const DEMO_CITIES = ['Miami', 'Austin', 'Denver'] as const;
+const DEMO_CITIES = ['Miami', 'Austin', 'Denver', 'Scottsdale', 'Nashville'] as const;
 
 interface Props {
   onSearch: (params: { city: string; startDate: string; endDate: string; guests: number }) => void;
@@ -37,7 +37,7 @@ export default function SearchBar({ onSearch, loading }: Props) {
       <form onSubmit={handleSubmit} className="flex items-center gap-2 flex-wrap">
         <input
           type="text"
-          placeholder="Try Miami, Austin, or Denver"
+          placeholder="Try Miami, Austin, Denver, Scottsdale, or Nashville"
           value={city}
           onChange={e => setCity(e.target.value)}
           className="border rounded-lg px-3 py-1.5 text-sm flex-1 min-w-32"

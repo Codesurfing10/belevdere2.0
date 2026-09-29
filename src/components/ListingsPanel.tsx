@@ -13,7 +13,7 @@ export default function ListingsPanel({ listings, onBook, selectedListing }: Pro
       <div className="text-center py-12 text-gray-500">
         <div className="text-4xl mb-3">🏠</div>
         <p className="font-medium">Search for a city to see available listings</p>
-        <p className="text-sm mt-1">Try Miami, Austin, or Denver</p>
+        <p className="text-sm mt-1">Try Miami, Austin, Denver, Scottsdale, or Nashville</p>
       </div>
     );
   }
