@@ -115,18 +115,18 @@ async function main() {
     }))
   );
 
-  // Create availability blocks for next 60 days
+  // Create availability blocks for next 60 days (UTC midnight so search date filters match)
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  today.setUTCHours(0, 0, 0, 0);
 
   for (const listing of listings) {
     const bookedPct = Math.random() * 0.4;
 
     for (let i = 0; i < 60; i++) {
       const start = new Date(today);
-      start.setDate(today.getDate() + i);
+      start.setUTCDate(today.getUTCDate() + i);
       const end = new Date(start);
-      end.setDate(start.getDate() + 1);
+      end.setUTCDate(start.getUTCDate() + 1);
 
       const isBooked = Math.random() < bookedPct;
 
