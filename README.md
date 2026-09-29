@@ -52,7 +52,7 @@ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY="pk_test_your_stripe_publishable_key"
 npm run db:generate    # Generate Prisma client
 npm run db:migrate:deploy  # Apply committed migrations (prod)
 # or: npm run db:migrate    # Dev migrate
-npm run db:seed        # Seed with 30 listings, 10 managers, catalog items, meals
+npm run db:seed        # Seed with 50 listings, 14 managers, catalog items, meals
 ```
 
 ### 4. Start the dev server

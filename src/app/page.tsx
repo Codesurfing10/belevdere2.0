@@ -195,7 +195,7 @@ export default function Home() {
     <div className="min-h-screen bg-gray-50">
       {/* Demo banner */}
       <div className="bg-amber-400 text-amber-950 text-center text-sm font-medium px-4 py-2">
-        Public demo — seed data for Miami, Austin, Denver. No real bookings.
+        Public demo — seed data for Miami, Austin, Denver, Scottsdale, Nashville. No real bookings.
       </div>
 
       {/* Header */}
