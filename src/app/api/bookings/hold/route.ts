@@ -9,6 +9,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'listingId, startDate, endDate, guests required' }, { status: 400 });
   }
 
+  if (!guestName || !String(guestName).trim() || !guestEmail || !String(guestEmail).trim()) {
+    return NextResponse.json({ error: 'guestName and guestEmail required' }, { status: 400 });
+  }
+
   const listing = await prisma.rentalListing.findUnique({ where: { id: listingId } });
   if (!listing) return NextResponse.json({ error: 'Listing not found' }, { status: 404 });
 
@@ -25,8 +29,8 @@ export async function POST(req: NextRequest) {
       guests: parseInt(guests),
       status: 'hold',
       totalPrice,
-      guestName: guestName || null,
-      guestEmail: guestEmail || null,
+      guestName: String(guestName).trim(),
+      guestEmail: String(guestEmail).trim(),
     }
   });
 

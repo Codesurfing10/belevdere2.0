@@ -11,7 +11,7 @@ import ChatDrawer from '@/components/ChatDrawer';
 
 const MapView = dynamic(() => import('@/components/MapView'), { ssr: false });
 
-type TabType = 'listings' | 'managers' | 'breakfast' | 'dinner' | 'toiletries' | 'equipment';
+type TabType = 'listings' | 'managers' | 'breakfast' | 'dinner' | 'toiletries' | 'food' | 'equipment';
 
 interface SearchParams {
   city: string;
@@ -32,6 +32,14 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<TabType>('listings');
   const [chatOpen, setChatOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [guestModalListing, setGuestModalListing] = useState<any>(null);
+  const [guestName, setGuestName] = useState('');
+  const [guestEmail, setGuestEmail] = useState('');
+  const [bookingLoading, setBookingLoading] = useState(false);
+  const [bookingError, setBookingError] = useState<string | null>(null);
+  const [checkoutStatus, setCheckoutStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [checkoutMessage, setCheckoutMessage] = useState<string | null>(null);
+  const [demoCheckout, setDemoCheckout] = useState(false);
 
   const handleSearch = useCallback(async (params: SearchParams) => {
     setLoading(true);
@@ -54,31 +62,66 @@ export default function Home() {
     }
   }, []);
 
-  const handleBookNow = async (listing: any) => {
+  const openBookModal = (listing: any) => {
     if (!searchParams.startDate || !searchParams.endDate) {
-      alert('Please select dates first');
+      setBookingError('Please select dates first (use Search).');
       return;
     }
-    const res = await fetch('/api/bookings/hold', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        listingId: listing.id,
-        startDate: searchParams.startDate,
-        endDate: searchParams.endDate,
-        guests: searchParams.guests,
-      })
-    });
-    const data = await res.json();
-    setSelectedListing(listing);
-    setBooking(data.booking);
-    setOrder(data.order);
-    setCartItems([]);
-    setActiveTab('breakfast');
+    setBookingError(null);
+    setGuestName('');
+    setGuestEmail('');
+    setGuestModalListing(listing);
+  };
+
+  const confirmBookNow = async () => {
+    if (!guestModalListing) return;
+    if (!guestName.trim() || !guestEmail.trim()) {
+      setBookingError('Guest name and email are required.');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail.trim())) {
+      setBookingError('Please enter a valid email.');
+      return;
+    }
+
+    setBookingLoading(true);
+    setBookingError(null);
+    try {
+      const res = await fetch('/api/bookings/hold', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          listingId: guestModalListing.id,
+          startDate: searchParams.startDate,
+          endDate: searchParams.endDate,
+          guests: searchParams.guests,
+          guestName: guestName.trim(),
+          guestEmail: guestEmail.trim(),
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setBookingError(data.error || 'Could not create hold booking.');
+        return;
+      }
+      setSelectedListing(guestModalListing);
+      setBooking(data.booking);
+      setOrder(data.order);
+      setCartItems([]);
+      setCheckoutStatus('idle');
+      setCheckoutMessage(null);
+      setDemoCheckout(false);
+      setActiveTab('breakfast');
+      setGuestModalListing(null);
+    } catch {
+      setBookingError('Network error creating booking.');
+    } finally {
+      setBookingLoading(false);
+    }
   };
 
   const handleAddToCart = async (type: 'catalog' | 'meal', id: string, qty: number = 1) => {
-    if (!booking) { alert('Please select a listing first'); return; }
+    if (!booking) { setCheckoutMessage('Please select a listing first'); setCheckoutStatus('error'); return; }
     const body: Record<string, unknown> = { bookingId: booking.id, qty };
     if (type === 'meal') { body.mealOptionId = id; body.type = 'meal'; }
     else { body.itemId = id; }
@@ -97,16 +140,36 @@ export default function Home() {
 
   const handleCheckout = async () => {
     if (!booking) return;
-    const res = await fetch('/api/checkout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ bookingId: booking.id })
-    });
-    const data = await res.json();
-    if (data.clientSecret) {
-      alert(`Checkout initiated! Payment Intent: ${data.paymentIntentId}\nTotal: $${data.amount.toFixed(2)}\n\nIn production, this would redirect to Stripe checkout.`);
-    } else if (data.error) {
-      alert(`Checkout error: ${data.error}`);
+    setCheckoutStatus('loading');
+    setCheckoutMessage(null);
+    try {
+      const res = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookingId: booking.id })
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setCheckoutStatus('error');
+        setCheckoutMessage(data.error || 'Checkout failed.');
+        return;
+      }
+      if (data.demoMode) {
+        setDemoCheckout(true);
+        setCheckoutStatus('success');
+        setCheckoutMessage(data.message || 'Demo checkout complete — no real charge.');
+        setBooking((prev: any) => prev ? { ...prev, status: 'confirmed' } : prev);
+        setOrder((prev: any) => prev ? { ...prev, status: 'paid' } : prev);
+        return;
+      }
+      setDemoCheckout(false);
+      setCheckoutStatus('success');
+      setCheckoutMessage(
+        `Payment ready for $${Number(data.amount).toFixed(2)}. Connect Stripe Elements in production to collect the card.`
+      );
+    } catch {
+      setCheckoutStatus('error');
+      setCheckoutMessage('Network error during checkout.');
     }
   };
 
@@ -123,12 +186,18 @@ export default function Home() {
     } else if (action.type === 'ADD_TO_CART') {
       handleAddToCart(action.itemType === 'meal' ? 'meal' : 'catalog', action.mealOptionId || action.itemId, action.qty);
     }
-    // 'listings' is omitted from deps intentionally; FILTER actions use functional setState(prev => ...)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, handleSearch]);
 
+  const inventoryTabs = ['breakfast', 'dinner', 'toiletries', 'food', 'equipment'] as const;
+
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Demo banner */}
+      <div className="bg-amber-400 text-amber-950 text-center text-sm font-medium px-4 py-2">
+        Public demo — seed data for Miami, Austin, Denver. No real bookings.
+      </div>
+
       {/* Header */}
       <header className="bg-white shadow-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-4">
@@ -145,6 +214,11 @@ export default function Home() {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 py-4">
+        {bookingError && !guestModalListing && (
+          <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {bookingError}
+          </div>
+        )}
         <div className="flex gap-4">
           {/* Left: Map + Content */}
           <div className="flex-1 min-w-0">
@@ -161,7 +235,7 @@ export default function Home() {
             {/* Tabs */}
             <div className="bg-white rounded-xl shadow-md">
               <div className="flex border-b overflow-x-auto">
-                {(['listings', 'managers', 'breakfast', 'dinner', 'toiletries', 'equipment'] as const).map(tab => (
+                {(['listings', 'managers', ...inventoryTabs] as const).map(tab => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
@@ -171,17 +245,22 @@ export default function Home() {
                      tab === 'managers' ? '👤 Managers' :
                      tab === 'breakfast' ? '🌅 Breakfast' :
                      tab === 'dinner' ? '🌙 Dinner' :
-                     tab === 'toiletries' ? '🧴 Toiletries' : '🚴 Equipment'}
+                     tab === 'toiletries' ? '🧴 Toiletries' :
+                     tab === 'food' ? '🍿 Food' : '🚴 Equipment'}
                   </button>
                 ))}
               </div>
               <div className="p-4">
                 {activeTab === 'listings' && (
-                  <ListingsPanel listings={listings} onBook={handleBookNow} selectedListing={selectedListing} />
+                  <ListingsPanel listings={listings} onBook={openBookModal} selectedListing={selectedListing} />
                 )}
                 {activeTab === 'managers' && <ManagersPanel managers={managers} />}
-                {(activeTab === 'breakfast' || activeTab === 'dinner' || activeTab === 'toiletries' || activeTab === 'equipment') && (
-                  <InventoryPanel activeTab={activeTab} onAddToCart={handleAddToCart} hasBooking={!!booking} />
+                {(inventoryTabs as readonly string[]).includes(activeTab) && (
+                  <InventoryPanel
+                    activeTab={activeTab as 'breakfast' | 'dinner' | 'toiletries' | 'food' | 'equipment'}
+                    onAddToCart={handleAddToCart}
+                    hasBooking={!!booking}
+                  />
                 )}
               </div>
             </div>
@@ -195,10 +274,71 @@ export default function Home() {
               cartItems={cartItems}
               order={order}
               onCheckout={handleCheckout}
+              checkoutStatus={checkoutStatus}
+              checkoutMessage={checkoutMessage}
+              demoCheckout={demoCheckout}
             />
           </div>
         </div>
       </div>
+
+      {/* Guest info modal */}
+      {guestModalListing && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-5">
+            <h2 className="text-lg font-bold text-gray-900">Guest details</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Holding <span className="font-medium text-indigo-600">{guestModalListing.title}</span> for your dates.
+            </p>
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1" htmlFor="guestName">Name</label>
+                <input
+                  id="guestName"
+                  type="text"
+                  value={guestName}
+                  onChange={e => setGuestName(e.target.value)}
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  placeholder="Jane Guest"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1" htmlFor="guestEmail">Email</label>
+                <input
+                  id="guestEmail"
+                  type="email"
+                  value={guestEmail}
+                  onChange={e => setGuestEmail(e.target.value)}
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  placeholder="jane@example.com"
+                />
+              </div>
+              {bookingError && (
+                <p className="text-sm text-red-600">{bookingError}</p>
+              )}
+            </div>
+            <div className="mt-5 flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => { setGuestModalListing(null); setBookingError(null); }}
+                className="px-4 py-2 text-sm rounded-lg border hover:bg-gray-50"
+                disabled={bookingLoading}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmBookNow}
+                disabled={bookingLoading}
+                className="px-4 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {bookingLoading ? 'Holding…' : 'Confirm hold'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Chat Button */}
       <button
