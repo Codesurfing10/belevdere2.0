@@ -1,5 +1,5 @@
 # Belvedere 2.0 — Render Blueprint for public demo
-# After deploy: set MAPBOX / Stripe env vars in the dashboard (sync: false below),
+# After deploy: set MAPBOX / Stripe / PayPal env vars in the dashboard (sync: false below),
 # then seed once: render shell → npm run db:seed
 databases:
   - name: belevdere-db
@@ -30,4 +30,14 @@ services:
       - key: STRIPE_WEBHOOK_SECRET
         sync: false
       - key: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+        sync: false
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_MODE
+        sync: false
+      - key: NEXT_PUBLIC_PAYPAL_CLIENT_ID
+        sync: false
+      - key: NEXT_PUBLIC_PAYPAL_ME_URL
         sync: false

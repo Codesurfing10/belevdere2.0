@@ -102,6 +102,7 @@ model Order {
   total         Float
   status        String   @default("pending")
   stripePaymentIntentId String?
+  paypalOrderId String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }

@@ -33,14 +33,14 @@ export default function SearchBar({ onSearch, loading }: Props) {
   };
 
   return (
-    <div className="space-y-1.5">
-      <form onSubmit={handleSubmit} className="flex items-center gap-2 flex-wrap">
+    <div className="space-y-2">
+      <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2">
         <input
           type="text"
-          placeholder="Try Miami, Austin, Denver, Scottsdale, or Nashville"
+          placeholder="City (Miami, Austin…)"
           value={city}
           onChange={e => setCity(e.target.value)}
-          className="border rounded-lg px-3 py-1.5 text-sm flex-1 min-w-32"
+          className="border rounded-lg px-3 py-2.5 sm:py-1.5 text-base sm:text-sm flex-1 min-w-0 w-full sm:min-w-32 min-h-[44px] sm:min-h-0"
           list="cities"
           aria-label="City"
         />
@@ -49,48 +49,53 @@ export default function SearchBar({ onSearch, loading }: Props) {
             <option key={c} value={c} />
           ))}
         </datalist>
-        <input
-          type="date"
-          value={startDate}
-          onChange={e => setStartDate(e.target.value)}
-          className="border rounded-lg px-3 py-1.5 text-sm"
-          aria-label="Check-in"
-        />
-        <span className="text-gray-400 text-sm">→</span>
-        <input
-          type="date"
-          value={endDate}
-          onChange={e => setEndDate(e.target.value)}
-          className="border rounded-lg px-3 py-1.5 text-sm"
-          aria-label="Check-out"
-        />
-        <input
-          type="number"
-          min={1}
-          max={20}
-          value={guests}
-          onChange={e => setGuests(parseInt(e.target.value) || 1)}
-          className="border rounded-lg px-3 py-1.5 text-sm w-20"
-          placeholder="Guests"
-          aria-label="Guests"
-        />
-        <button
-          type="submit"
-          disabled={loading}
-          className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-indigo-700 disabled:opacity-50"
-        >
-          {loading ? 'Searching...' : 'Search'}
-        </button>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <input
+            type="date"
+            value={startDate}
+            onChange={e => setStartDate(e.target.value)}
+            className="border rounded-lg px-2 sm:px-3 py-2.5 sm:py-1.5 text-base sm:text-sm flex-1 min-w-0 min-h-[44px] sm:min-h-0"
+            aria-label="Check-in"
+          />
+          <span className="text-gray-400 text-sm shrink-0">→</span>
+          <input
+            type="date"
+            value={endDate}
+            onChange={e => setEndDate(e.target.value)}
+            className="border rounded-lg px-2 sm:px-3 py-2.5 sm:py-1.5 text-base sm:text-sm flex-1 min-w-0 min-h-[44px] sm:min-h-0"
+            aria-label="Check-out"
+          />
+        </div>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <input
+            type="number"
+            min={1}
+            max={20}
+            value={guests}
+            onChange={e => setGuests(parseInt(e.target.value) || 1)}
+            className="border rounded-lg px-3 py-2.5 sm:py-1.5 text-base sm:text-sm w-24 sm:w-20 min-h-[44px] sm:min-h-0"
+            placeholder="Guests"
+            aria-label="Guests"
+          />
+          <button
+            type="submit"
+            disabled={loading}
+            className="flex-1 sm:flex-none bg-indigo-600 text-white px-4 py-2.5 sm:py-1.5 rounded-lg text-sm font-medium
+              hover:bg-indigo-700 disabled:opacity-50 min-h-[44px] sm:min-h-0 touch-manipulation"
+          >
+            {loading ? 'Searching…' : 'Search'}
+          </button>
+        </div>
       </form>
       <div className="flex items-center gap-2 flex-wrap text-xs text-gray-500">
-        <span>Try these cities:</span>
+        <span className="shrink-0">Try:</span>
         {DEMO_CITIES.map(c => (
           <button
             key={c}
             type="button"
             onClick={() => handleCityChip(c)}
             disabled={loading}
-            className={`rounded-full px-2.5 py-0.5 border transition-colors ${
+            className={`rounded-full px-3 py-1.5 min-h-[36px] border transition-colors touch-manipulation ${
               city === c
                 ? 'bg-indigo-100 border-indigo-300 text-indigo-700'
                 : 'bg-white border-gray-200 hover:border-indigo-300 hover:text-indigo-600'
