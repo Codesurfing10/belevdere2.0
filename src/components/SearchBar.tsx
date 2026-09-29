@@ -1,6 +1,8 @@
 'use client';
 import { useState } from 'react';
 
+const DEMO_CITIES = ['Miami', 'Austin', 'Denver'] as const;
+
 interface Props {
   onSearch: (params: { city: string; startDate: string; endDate: string; guests: number }) => void;
   loading?: boolean;
@@ -16,55 +18,88 @@ export default function SearchBar({ onSearch, loading }: Props) {
   const [endDate, setEndDate] = useState(fmt(nextWeek));
   const [guests, setGuests] = useState(2);
 
+  const runSearch = (nextCity: string = city) => {
+    onSearch({ city: nextCity, startDate, endDate, guests });
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSearch({ city, startDate, endDate, guests });
+    runSearch();
+  };
+
+  const handleCityChip = (c: string) => {
+    setCity(c);
+    runSearch(c);
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex items-center gap-2 flex-wrap">
-      <input
-        type="text"
-        placeholder="City (Miami, Austin, Denver)"
-        value={city}
-        onChange={e => setCity(e.target.value)}
-        className="border rounded-lg px-3 py-1.5 text-sm flex-1 min-w-32"
-        list="cities"
-      />
-      <datalist id="cities">
-        <option value="Miami" />
-        <option value="Austin" />
-        <option value="Denver" />
-      </datalist>
-      <input
-        type="date"
-        value={startDate}
-        onChange={e => setStartDate(e.target.value)}
-        className="border rounded-lg px-3 py-1.5 text-sm"
-      />
-      <span className="text-gray-400 text-sm">→</span>
-      <input
-        type="date"
-        value={endDate}
-        onChange={e => setEndDate(e.target.value)}
-        className="border rounded-lg px-3 py-1.5 text-sm"
-      />
-      <input
-        type="number"
-        min={1}
-        max={20}
-        value={guests}
-        onChange={e => setGuests(parseInt(e.target.value) || 1)}
-        className="border rounded-lg px-3 py-1.5 text-sm w-20"
-        placeholder="Guests"
-      />
-      <button
-        type="submit"
-        disabled={loading}
-        className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-indigo-700 disabled:opacity-50"
-      >
-        {loading ? 'Searching...' : 'Search'}
-      </button>
-    </form>
+    <div className="space-y-1.5">
+      <form onSubmit={handleSubmit} className="flex items-center gap-2 flex-wrap">
+        <input
+          type="text"
+          placeholder="Try Miami, Austin, or Denver"
+          value={city}
+          onChange={e => setCity(e.target.value)}
+          className="border rounded-lg px-3 py-1.5 text-sm flex-1 min-w-32"
+          list="cities"
+          aria-label="City"
+        />
+        <datalist id="cities">
+          {DEMO_CITIES.map(c => (
+            <option key={c} value={c} />
+          ))}
+        </datalist>
+        <input
+          type="date"
+          value={startDate}
+          onChange={e => setStartDate(e.target.value)}
+          className="border rounded-lg px-3 py-1.5 text-sm"
+          aria-label="Check-in"
+        />
+        <span className="text-gray-400 text-sm">→</span>
+        <input
+          type="date"
+          value={endDate}
+          onChange={e => setEndDate(e.target.value)}
+          className="border rounded-lg px-3 py-1.5 text-sm"
+          aria-label="Check-out"
+        />
+        <input
+          type="number"
+          min={1}
+          max={20}
+          value={guests}
+          onChange={e => setGuests(parseInt(e.target.value) || 1)}
+          className="border rounded-lg px-3 py-1.5 text-sm w-20"
+          placeholder="Guests"
+          aria-label="Guests"
+        />
+        <button
+          type="submit"
+          disabled={loading}
+          className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-indigo-700 disabled:opacity-50"
+        >
+          {loading ? 'Searching...' : 'Search'}
+        </button>
+      </form>
+      <div className="flex items-center gap-2 flex-wrap text-xs text-gray-500">
+        <span>Try these cities:</span>
+        {DEMO_CITIES.map(c => (
+          <button
+            key={c}
+            type="button"
+            onClick={() => handleCityChip(c)}
+            disabled={loading}
+            className={`rounded-full px-2.5 py-0.5 border transition-colors ${
+              city === c
+                ? 'bg-indigo-100 border-indigo-300 text-indigo-700'
+                : 'bg-white border-gray-200 hover:border-indigo-300 hover:text-indigo-600'
+            }`}
+          >
+            {c}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }

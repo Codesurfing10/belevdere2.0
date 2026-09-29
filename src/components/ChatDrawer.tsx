@@ -16,7 +16,7 @@ export default function ChatDrawer({ onClose, onAction, bookingId }: Props) {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: "Hi! I'm your rental assistant 🏠 I can help you find properties, filter by price or amenities, and add meals or equipment to your stay. Try: 'show cheaper options', 'pet friendly', 'add breakfast for 2', or 'rent 2 bikes'!"
+      content: "Hi! I'm a rule-based rental assistant (not AI). I can filter listings by price or amenities and add meals or equipment to your stay. Try: 'show cheaper options', 'pet friendly', 'add breakfast for 2', or 'rent 2 bikes'!"
     }
   ]);
   const [input, setInput] = useState('');
@@ -64,8 +64,8 @@ export default function ChatDrawer({ onClose, onAction, bookingId }: Props) {
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b bg-indigo-600 rounded-t-2xl">
           <div>
-            <h3 className="font-bold text-white">🤖 Rental Assistant</h3>
-            <p className="text-xs text-indigo-200">AI-powered search &amp; booking helper</p>
+            <h3 className="font-bold text-white">💬 Rental Assistant</h3>
+            <p className="text-xs text-indigo-200">Rule-based helper · filters &amp; cart shortcuts</p>
           </div>
           <button onClick={onClose} className="text-white hover:text-indigo-200 text-xl leading-none">✕</button>
         </div>
@@ -113,7 +113,7 @@ export default function ChatDrawer({ onClose, onAction, bookingId }: Props) {
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && sendMessage()}
-            placeholder="Ask me anything..."
+            placeholder="Ask about filters or cart items..."
             className="flex-1 border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
           />
           <button

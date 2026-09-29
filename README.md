@@ -50,7 +50,8 @@ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY="pk_test_your_stripe_publishable_key"
 
 ```bash
 npm run db:generate    # Generate Prisma client
-npm run db:migrate     # Run migrations (creates tables)
+npm run db:migrate:deploy  # Apply committed migrations (prod)
+# or: npm run db:migrate    # Dev migrate
 npm run db:seed        # Seed with 30 listings, 10 managers, catalog items, meals
 ```
 
@@ -61,6 +62,26 @@ npm run dev
 ```
 
 Open http://localhost:3000.
+
+
+## Deploy (Render Blueprint)
+
+This repo includes a `render.yaml` Blueprint:
+
+1. In Render: **New → Blueprint** → connect this repo / branch.
+2. Render creates a Postgres DB + Node web service. `DATABASE_URL` is wired automatically.
+3. Set dashboard env vars marked `sync: false` in the Blueprint:
+   - `NEXT_PUBLIC_MAPBOX_TOKEN` / `MAPBOX_TOKEN` (map + geocoding)
+   - `STRIPE_SECRET_KEY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET` (optional)
+4. Without real Stripe keys (or with placeholder values), checkout runs in **DEMO_MODE**: order → `paid`, booking → `confirmed`, no charge.
+5. After first deploy, seed demo data once from a Render shell:
+   ```bash
+   npm run db:seed
+   ```
+
+Build/start (Blueprint):
+- build: `npm install && npx prisma generate && npm run build`
+- start: `npx prisma migrate deploy && npm run start`
 
 ## API Reference
 

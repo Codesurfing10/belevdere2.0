@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { ensureArray } from '@/lib/utils';
 
-type InventoryTab = 'breakfast' | 'dinner' | 'toiletries' | 'equipment';
+type InventoryTab = 'breakfast' | 'dinner' | 'toiletries' | 'food' | 'equipment';
 
 interface Props {
   activeTab: InventoryTab;
