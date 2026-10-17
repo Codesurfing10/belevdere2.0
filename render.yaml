@@ -21,6 +21,19 @@ services:
           property: connectionString
       - key: NODE_VERSION
         value: "20"
+      # Signs session/booking cookies (required in production)
+      - key: SESSION_SECRET
+        generateValue: true
+      # Basic-auth password for /admin and /api/admin (admin disabled if unset)
+      - key: ADMIN_PASSWORD
+        sync: false
+      # Set to "true" ONLY for the public demo (marks orders paid with no charge).
+      # Unset in production: checkout fails safe (503) until real keys are set.
+      - key: DEMO_MODE
+        sync: false
+      # Optional error reporting
+      - key: SENTRY_DSN
+        sync: false
       - key: NEXT_PUBLIC_MAPBOX_TOKEN
         sync: false
       - key: MAPBOX_TOKEN

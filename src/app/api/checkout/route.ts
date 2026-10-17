@@ -1,21 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import Stripe from 'stripe';
+import { isDemoMode, isPlaceholderStripeKey, PAYMENTS_NOT_CONFIGURED } from '@/lib/payments';
+import { ownsBooking } from '@/lib/security';
+import { captureError } from '@/lib/monitoring';
 
-function isDemoStripeKey(key: string | undefined): boolean {
-  if (!key || !key.trim()) return true;
-  const k = key.trim();
-  if (k === 'sk_test_placeholder') return true;
-  if (k.includes('your_stripe')) return true;
-  if (k.startsWith('sk_test_your_') || k.startsWith('sk_live_your_')) return true;
-  return false;
-}
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
+  const body = await req.json().catch(() => ({}));
   const { bookingId } = body;
 
   if (!bookingId) return NextResponse.json({ error: 'bookingId required' }, { status: 400 });
+
+  if (!(await ownsBooking(req, bookingId))) {
+    return NextResponse.json({ error: 'Not authorized for this booking' }, { status: 403 });
+  }
 
   const order = await prisma.order.findUnique({
     where: { bookingId },
@@ -25,10 +24,12 @@ export async function POST(req: NextRequest) {
   if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 });
 
   const stripeKey = process.env.STRIPE_SECRET_KEY;
-  const forceDemo = process.env.DEMO_MODE === 'true' || process.env.DEMO_MODE === '1';
-  const demoMode = forceDemo || isDemoStripeKey(stripeKey);
+  if (order.status === 'paid') {
+    return NextResponse.json({ success: true, alreadyPaid: true, orderId: order.id, bookingId });
+  }
 
-  if (demoMode) {
+  // Explicit opt-in only: DEMO_MODE=true marks paid without charging (public demo).
+  if (isDemoMode()) {
     await prisma.$transaction([
       prisma.order.update({
         where: { id: order.id },
@@ -51,6 +52,11 @@ export async function POST(req: NextRequest) {
       orderId: order.id,
       bookingId,
     });
+  }
+
+  if (isPlaceholderStripeKey(stripeKey)) {
+    // Fail safe: no keys and no DEMO_MODE -> leave order pending / booking on hold.
+    return NextResponse.json(PAYMENTS_NOT_CONFIGURED, { status: 503 });
   }
 
   try {
@@ -84,6 +90,7 @@ export async function POST(req: NextRequest) {
       message: 'PaymentIntent created. Complete payment with Stripe on the client.',
     });
   } catch (err: unknown) {
+    await captureError(err, { route: 'checkout', bookingId });
     const message = err instanceof Error ? err.message : 'Stripe checkout failed';
     return NextResponse.json({ error: message, success: false }, { status: 500 });
   }
