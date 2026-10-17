@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { ownsBooking } from '@/lib/security';
 
 /** Extracts a numeric quantity from a natural-language message, defaulting to `defaultQty`. */
 function extractQuantity(msg: string, defaultQty: number): number {
@@ -8,9 +9,17 @@ function extractQuantity(msg: string, defaultQty: number): number {
 }
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const { message, context } = body;
-  const lowerMsg = (message as string).toLowerCase();
+  const body = await req.json().catch(() => ({}));
+  const { message } = body;
+  let { context } = body;
+  if (typeof message !== 'string' || !message.trim()) {
+    return NextResponse.json({ error: 'message required' }, { status: 400 });
+  }
+  // Only allow cart actions on a booking this browser owns.
+  if (context?.bookingId && !(await ownsBooking(req, String(context.bookingId)))) {
+    context = { ...context, bookingId: undefined };
+  }
+  const lowerMsg = message.slice(0, 1000).toLowerCase();
 
   let response = '';
   let action: Record<string, unknown> | null = null;

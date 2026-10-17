@@ -4,6 +4,9 @@ import {
   createPayPalOrder,
   isPayPalConfigured,
 } from '@/lib/paypal';
+import { isDemoMode, PAYMENTS_NOT_CONFIGURED } from '@/lib/payments';
+import { ownsBooking } from '@/lib/security';
+import { captureError } from '@/lib/monitoring';
 
 /**
  * POST /api/checkout/paypal
@@ -18,6 +21,10 @@ export async function POST(req: NextRequest) {
 
   if (!bookingId) {
     return NextResponse.json({ error: 'bookingId required' }, { status: 400 });
+  }
+
+  if (!(await ownsBooking(req, bookingId))) {
+    return NextResponse.json({ error: 'Not authorized for this booking' }, { status: 403 });
   }
 
   const order = await prisma.order.findUnique({
@@ -40,7 +47,11 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  if (!isPayPalConfigured()) {
+  if (!isDemoMode() && !isPayPalConfigured()) {
+    return NextResponse.json(PAYMENTS_NOT_CONFIGURED, { status: 503 });
+  }
+
+  if (isDemoMode()) {
     await prisma.$transaction([
       prisma.order.update({
         where: { id: order.id },
@@ -90,6 +101,7 @@ export async function POST(req: NextRequest) {
       message: 'PayPal order created. Approve payment with the PayPal buttons.',
     });
   } catch (err: unknown) {
+    await captureError(err, { route: 'checkout/paypal', bookingId });
     const message = err instanceof Error ? err.message : 'PayPal checkout failed';
     return NextResponse.json({ error: message, success: false }, { status: 500 });
   }
@@ -106,7 +118,7 @@ export async function GET() {
 
   return NextResponse.json({
     configured,
-    demoMode: !configured,
+    demoMode: isDemoMode(),
     clientId: publicClientId,
     mode: process.env.PAYPAL_MODE === 'live' ? 'live' : 'sandbox',
   });

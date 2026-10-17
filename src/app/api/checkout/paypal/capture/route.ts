@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { capturePayPalOrder, isPayPalConfigured } from '@/lib/paypal';
+import { ownsBooking } from '@/lib/security';
+import { captureError } from '@/lib/monitoring';
 
 type CaptureResponse = {
   id: string;
@@ -37,6 +39,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  if (!(await ownsBooking(req, bookingId))) {
+    return NextResponse.json({ error: 'Not authorized for this booking' }, { status: 403 });
+  }
+
   const order = await prisma.order.findUnique({
     where: { bookingId },
   });
@@ -57,8 +63,8 @@ export async function POST(req: NextRequest) {
 
   if (!isPayPalConfigured()) {
     return NextResponse.json(
-      { error: 'PayPal is not configured; use demo create endpoint instead.' },
-      { status: 400 }
+      { error: 'PayPal is not configured; no charge was made.', code: 'PAYMENTS_NOT_CONFIGURED' },
+      { status: 503 }
     );
   }
 
@@ -107,6 +113,7 @@ export async function POST(req: NextRequest) {
       paypalStatus: capture.status,
     });
   } catch (err: unknown) {
+    await captureError(err, { route: 'checkout/paypal/capture', bookingId });
     const message = err instanceof Error ? err.message : 'PayPal capture failed';
     return NextResponse.json({ error: message, success: false }, { status: 500 });
   }

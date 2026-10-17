@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { ownsBooking } from '@/lib/security';
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const { bookingId, itemId, mealOptionId, qty = 1, type } = body;
+  const body = await req.json().catch(() => ({}));
+  const { bookingId, itemId, mealOptionId, qty: rawQty = 1, type } = body;
+  const qty = Math.min(Math.max(parseInt(String(rawQty)) || 1, 1), 50);
 
   if (!bookingId) return NextResponse.json({ error: 'bookingId required' }, { status: 400 });
+
+  if (!(await ownsBooking(req, bookingId))) {
+    return NextResponse.json({ error: 'Not authorized for this booking' }, { status: 403 });
+  }
 
   const order = await prisma.order.findUnique({ where: { bookingId } });
   if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 });

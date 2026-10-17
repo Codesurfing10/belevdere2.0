@@ -17,6 +17,11 @@ export default function Footer() {
           <p className="text-sm text-gray-500 leading-relaxed">
             © {new Date().getFullYear()} Belevdere — short-term rentals, supplies & meals
           </p>
+          <nav className="flex justify-center gap-4 text-xs text-gray-500">
+            <a className="underline" href="/privacy">Privacy</a>
+            <a className="underline" href="/terms">Terms</a>
+            <a className="underline" href="/refunds">Refunds</a>
+          </nav>
 
           {hasLink ? (
             <a
