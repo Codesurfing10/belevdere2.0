@@ -7,14 +7,23 @@ function clientIp(req: NextRequest): string {
   return (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() || 'unknown';
 }
 
+function constantTimeEqual(a: string, b: string): boolean {
+  let diff = a.length ^ b.length;
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    diff |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
+  }
+  return diff === 0;
+}
+
 function adminAuthorized(req: NextRequest): boolean {
   const pw = process.env.ADMIN_PASSWORD;
   if (!pw) return false; // admin disabled unless a password is configured
   const h = req.headers.get('authorization') || '';
   if (!h.startsWith('Basic ')) return false;
   try {
-    const [, pass] = atob(h.slice(6)).split(':');
-    return pass === pw;
+    const decoded = atob(h.slice(6));
+    const pass = decoded.slice(decoded.indexOf(':') + 1);
+    return constantTimeEqual(pass, pw);
   } catch {
     return false;
   }
@@ -63,5 +72,5 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   // webhooks authenticate via provider signatures; skip static assets
-  matcher: ['/((?!_next/|favicon|api/webhooks/).*)'],
+  matcher: ['/((?!_next/|favicon|api/webhooks/|sw\\.js|manifest\\.webmanifest|icons/|offline\\.html).*)'],
 };

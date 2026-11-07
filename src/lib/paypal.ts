@@ -126,3 +126,27 @@ export async function capturePayPalOrder(paypalOrderId: string): Promise<{
 
   return (await res.json()) as { id: string; status: string };
 }
+
+export type PayPalAmount = { currency_code?: string; value?: string };
+export type PayPalOrderDetails = {
+  id: string;
+  status: string;
+  purchase_units?: Array<{
+    amount?: PayPalAmount;
+    custom_id?: string;
+    invoice_id?: string;
+    payments?: {
+      captures?: Array<{ status?: string; amount?: PayPalAmount; custom_id?: string; invoice_id?: string }>;
+    };
+  }>;
+};
+
+export async function getPayPalOrder(paypalOrderId: string): Promise<PayPalOrderDetails> {
+  const token = await getPayPalAccessToken();
+  const res = await fetch(
+    `${getPayPalApiBase()}/v2/checkout/orders/${encodeURIComponent(paypalOrderId)}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (!res.ok) throw new Error(`PayPal get order failed (${res.status})`);
+  return (await res.json()) as PayPalOrderDetails;
+}

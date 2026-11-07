@@ -15,6 +15,9 @@ export async function POST(req: NextRequest) {
 
   const order = await prisma.order.findUnique({ where: { bookingId } });
   if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+  if (order.status !== 'pending') {
+    return NextResponse.json({ error: 'This order is already paid and can no longer be changed.' }, { status: 409 });
+  }
 
   let unitPrice = 0;
   const cartItemData: {
@@ -50,7 +53,8 @@ export async function POST(req: NextRequest) {
 
   await prisma.order.update({
     where: { id: order.id },
-    data: { subtotal, total }
+    // Total changed: drop provider references so checkout must create a new, correctly priced payment.
+    data: { subtotal, total, stripePaymentIntentId: null, paypalOrderId: null }
   });
 
   return NextResponse.json({ cartItem, subtotal, total });

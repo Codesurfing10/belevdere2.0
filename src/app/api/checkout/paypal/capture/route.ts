@@ -1,64 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { capturePayPalOrder, isPayPalConfigured } from '@/lib/paypal';
+import { capturePayPalOrder, getPayPalOrder, isPayPalConfigured, type PayPalOrderDetails } from '@/lib/paypal';
+import { verifyPayPalCapture, verifyPayPalOrderBeforeCapture } from '@/lib/paypalVerify';
 import { ownsBooking } from '@/lib/security';
 import { captureError } from '@/lib/monitoring';
-
-type CaptureResponse = {
-  id: string;
-  status: string;
-  purchase_units?: Array<{
-    payments?: {
-      captures?: Array<{ status?: string }>;
-    };
-  }>;
-};
-
-function isCaptureCompleted(capture: CaptureResponse): boolean {
-  if (capture.status === 'COMPLETED') return true;
-  const nested = capture.purchase_units?.[0]?.payments?.captures?.[0]?.status;
-  return nested === 'COMPLETED';
-}
+import { serverError } from '@/lib/http';
 
 /**
  * POST /api/checkout/paypal/capture
  * Body: { bookingId: string, paypalOrderId: string }
- * Captures an approved PayPal order and marks booking confirmed.
+ * Verifies the PayPal order belongs to this booking and matches the order total/currency,
+ * captures it, re-verifies the captured amount, then atomically marks order paid + booking confirmed.
  */
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
-  const { bookingId, paypalOrderId } = body as {
-    bookingId?: string;
-    paypalOrderId?: string;
-  };
+  const { bookingId, paypalOrderId } = body as { bookingId?: string; paypalOrderId?: string };
 
-  if (!bookingId || !paypalOrderId) {
-    return NextResponse.json(
-      { error: 'bookingId and paypalOrderId required' },
-      { status: 400 }
-    );
+  if (typeof bookingId !== 'string' || !bookingId || typeof paypalOrderId !== 'string' || !paypalOrderId) {
+    return NextResponse.json({ error: 'bookingId and paypalOrderId required' }, { status: 400 });
   }
 
   if (!(await ownsBooking(req, bookingId))) {
     return NextResponse.json({ error: 'Not authorized for this booking' }, { status: 403 });
   }
 
-  const order = await prisma.order.findUnique({
-    where: { bookingId },
-  });
-
-  if (!order) {
-    return NextResponse.json({ error: 'Order not found' }, { status: 404 });
-  }
+  const order = await prisma.order.findUnique({ where: { bookingId } });
+  if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 });
 
   if (order.status === 'paid') {
-    return NextResponse.json({
-      success: true,
-      alreadyPaid: true,
-      message: 'Order already paid.',
-      orderId: order.id,
-      bookingId,
-    });
+    return NextResponse.json({ success: true, alreadyPaid: true, message: 'Order already paid.', orderId: order.id, bookingId });
   }
 
   if (!isPayPalConfigured()) {
@@ -68,39 +38,47 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (order.paypalOrderId && order.paypalOrderId !== paypalOrderId) {
-    return NextResponse.json(
-      { error: 'paypalOrderId does not match this booking order' },
-      { status: 400 }
-    );
+  // Must be the PayPal order our server created for this booking.
+  if (!order.paypalOrderId || order.paypalOrderId !== paypalOrderId) {
+    return NextResponse.json({ error: 'paypalOrderId does not match this booking order' }, { status: 400 });
   }
 
-  try {
-    const capture = (await capturePayPalOrder(paypalOrderId)) as CaptureResponse;
+  const expected = { total: order.total, currency: 'USD', bookingId, orderId: order.id };
 
-    if (!isCaptureCompleted(capture)) {
+  try {
+    const details = await getPayPalOrder(paypalOrderId);
+    const preProblem = verifyPayPalOrderBeforeCapture(details, expected);
+    if (preProblem) {
+      await captureError(new Error(`PayPal pre-capture check failed: ${preProblem}`), { route: 'checkout/paypal/capture', bookingId });
       return NextResponse.json(
-        {
-          error: `PayPal capture not completed (status: ${capture.status})`,
-          success: false,
-        },
+        { error: 'Your order changed since PayPal was opened. No charge was made; please start checkout again.', code: 'ORDER_CHANGED' },
+        { status: 409 }
+      );
+    }
+
+    const capture = (await capturePayPalOrder(paypalOrderId)) as PayPalOrderDetails;
+    const problem = verifyPayPalCapture(capture, expected);
+    if (problem) {
+      await captureError(new Error(`PayPal capture not applied: ${problem}`), {
+        route: 'checkout/paypal/capture',
+        bookingId,
+        paypalOrderId,
+      });
+      return NextResponse.json(
+        { error: 'Payment could not be confirmed. Your booking is still pending; contact support if you were charged.', success: false },
         { status: 402 }
       );
     }
 
-    await prisma.$transaction([
-      prisma.order.update({
-        where: { id: order.id },
-        data: {
-          status: 'paid',
-          paypalOrderId,
-        },
-      }),
-      prisma.booking.update({
-        where: { id: bookingId },
-        data: { status: 'confirmed' },
-      }),
-    ]);
+    await prisma.$transaction(async (tx) => {
+      const updated = await tx.order.updateMany({
+        where: { id: order.id, status: 'pending', paypalOrderId },
+        data: { status: 'paid' },
+      });
+      if (updated.count === 1) {
+        await tx.booking.update({ where: { id: bookingId }, data: { status: 'confirmed' } });
+      }
+    });
 
     return NextResponse.json({
       success: true,
@@ -110,11 +88,8 @@ export async function POST(req: NextRequest) {
       orderId: order.id,
       bookingId,
       paypalOrderId,
-      paypalStatus: capture.status,
     });
   } catch (err: unknown) {
-    await captureError(err, { route: 'checkout/paypal/capture', bookingId });
-    const message = err instanceof Error ? err.message : 'PayPal capture failed';
-    return NextResponse.json({ error: message, success: false }, { status: 500 });
+    return serverError('checkout/paypal/capture', err, { bookingId });
   }
 }

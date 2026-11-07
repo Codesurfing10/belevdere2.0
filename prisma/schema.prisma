@@ -66,6 +66,8 @@ model Booking {
   order      Order?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+
+  @@index([listingId, startDate, endDate])
 }
 
 model CatalogItem {
@@ -118,4 +120,12 @@ model CartItem {
   quantity     Int      @default(1)
   unitPrice    Float
   createdAt    DateTime @default(now())
+}
+
+/// Provider webhook events already processed (idempotency for retries/duplicates).
+model ProcessedWebhookEvent {
+  id        String   @id
+  provider  String
+  type      String
+  createdAt DateTime @default(now())
 }
