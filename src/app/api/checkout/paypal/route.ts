@@ -6,7 +6,8 @@ import {
 } from '@/lib/paypal';
 import { isDemoMode, PAYMENTS_NOT_CONFIGURED } from '@/lib/payments';
 import { ownsBooking } from '@/lib/security';
-import { captureError } from '@/lib/monitoring';
+import { serverError } from '@/lib/http';
+import { isHoldExpired } from '@/lib/booking';
 
 /**
  * POST /api/checkout/paypal
@@ -45,6 +46,13 @@ export async function POST(req: NextRequest) {
       orderId: order.id,
       bookingId,
     });
+  }
+
+  if (order.booking.status !== 'hold' || isHoldExpired(order.booking)) {
+    return NextResponse.json(
+      { error: 'This hold has expired or is no longer payable. Please place a new hold.', code: 'HOLD_EXPIRED' },
+      { status: 409 }
+    );
   }
 
   if (!isDemoMode() && !isPayPalConfigured()) {
@@ -101,9 +109,7 @@ export async function POST(req: NextRequest) {
       message: 'PayPal order created. Approve payment with the PayPal buttons.',
     });
   } catch (err: unknown) {
-    await captureError(err, { route: 'checkout/paypal', bookingId });
-    const message = err instanceof Error ? err.message : 'PayPal checkout failed';
-    return NextResponse.json({ error: message, success: false }, { status: 500 });
+    return serverError('checkout/paypal', err, { bookingId });
   }
 }
 

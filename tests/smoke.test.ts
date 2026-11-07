@@ -3,10 +3,11 @@ import { NextRequest } from 'next/server';
 
 const db = vi.hoisted(() => ({
   rentalListing: { findMany: vi.fn(), findUnique: vi.fn() },
-  availabilityBlock: { findMany: vi.fn() },
-  booking: { create: vi.fn(), update: vi.fn() },
+  availabilityBlock: { findMany: vi.fn(), count: vi.fn() },
+  booking: { create: vi.fn(), update: vi.fn(), count: vi.fn() },
   order: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
   $transaction: vi.fn(),
+  $queryRaw: vi.fn(),
 }));
 vi.mock('@/lib/prisma', () => ({ prisma: db }));
 
@@ -22,6 +23,8 @@ const listing = {
   serviceFee: 25, maxGuests: 4, amenities: [], images: [], manager: { rating: 4.5 },
   availabilityBlocks: [{ isAvailable: true }, { isAvailable: true }],
 };
+
+const day = (offset: number) => new Date(Date.now() + offset * 86400000).toISOString().slice(0, 10);
 
 function post(url: string, body: unknown, cookie?: string) {
   return new NextRequest(url, {
@@ -61,11 +64,15 @@ describe('search', () => {
 
 describe('booking hold', () => {
   it('creates a hold + pending order and sets ownership cookie', async () => {
+    db.$transaction.mockImplementation(async (fn: (tx: typeof db) => unknown) => fn(db));
+    db.$queryRaw.mockResolvedValue([{ id: 'l1' }]);
+    db.booking.count.mockResolvedValue(0);
+    db.availabilityBlock.count.mockResolvedValue(0);
     db.rentalListing.findUnique.mockResolvedValue(listing);
     db.booking.create.mockImplementation(async ({ data }) => ({ id: 'b1', ...data }));
     db.order.create.mockImplementation(async ({ data }) => ({ id: 'o1', ...data }));
     const res = await hold(post('http://x/api/bookings/hold', {
-      listingId: 'l1', startDate: '2026-11-01', endDate: '2026-11-03', guests: 2,
+      listingId: 'l1', startDate: day(10), endDate: day(12), guests: 2,
       guestName: 'Test', guestEmail: 't@example.com',
     }));
     const data = await res.json();
@@ -78,7 +85,7 @@ describe('booking hold', () => {
   it('rejects bad date ranges', async () => {
     db.rentalListing.findUnique.mockResolvedValue(listing);
     const res = await hold(post('http://x/api/bookings/hold', {
-      listingId: 'l1', startDate: '2026-11-03', endDate: '2026-11-01', guests: 2,
+      listingId: 'l1', startDate: day(12), endDate: day(10), guests: 2,
       guestName: 'T', guestEmail: 't@example.com',
     }));
     expect(res.status).toBe(400);
@@ -86,7 +93,7 @@ describe('booking hold', () => {
 });
 
 describe('checkout fail-safe', () => {
-  const order = { id: 'o1', bookingId: 'b1', total: 275, status: 'pending', booking: { status: 'hold', listing } };
+  const order = { id: 'o1', bookingId: 'b1', total: 275, status: 'pending', booking: { status: 'hold', createdAt: new Date(), listing } };
 
   it('refuses checkout for a booking the caller does not own', async () => {
     const res = await checkout(post('http://x/api/checkout', { bookingId: 'b1' }));

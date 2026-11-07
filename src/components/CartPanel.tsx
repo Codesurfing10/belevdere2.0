@@ -114,16 +114,16 @@ export default function CartPanel({
       </div>
 
       {checkoutStatus === 'success' && (
-        <div className="mt-3 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+        <div role="status" className="mt-3 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
           <p className="font-semibold">
-            {demoCheckout ? '✓ Demo booking confirmed' : '✓ Payment successful'}
+            {demoCheckout ? '✓ Demo booking confirmed' : isPaid ? '✓ Payment successful' : 'Payment started — not yet confirmed'}
           </p>
           <p className="text-xs mt-1 text-green-700 leading-snug break-words">{checkoutMessage}</p>
         </div>
       )}
 
       {checkoutStatus === 'error' && (
-        <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+        <div role="alert" className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
           <p className="font-semibold">Checkout failed</p>
           <p className="text-xs mt-1 leading-snug break-words">{checkoutMessage || 'Something went wrong.'}</p>
         </div>

@@ -246,7 +246,7 @@ export default function Home() {
         </div>
       </header>
 
-      <div className="flex-1 max-w-7xl mx-auto w-full px-3 sm:px-4 py-3 sm:py-4">
+      <main id="main-content" tabIndex={-1} className="flex-1 max-w-7xl mx-auto w-full px-3 sm:px-4 py-3 sm:py-4 focus:outline-none">
         {bookingError && !guestModalListing && (
           <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
             {bookingError}
@@ -319,15 +319,22 @@ export default function Home() {
             />
           </div>
         </div>
-      </div>
+      </main>
 
       <Footer />
 
       {/* Guest info modal — full-width friendly on phones */}
       {guestModalListing && (
         <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4">
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full max-w-md p-5 max-h-[90vh] overflow-y-auto">
-            <h2 className="text-lg font-bold text-gray-900">Guest details</h2>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="guest-modal-title"
+            onKeyDown={e => { if (e.key === 'Escape' && !bookingLoading) { setGuestModalListing(null); setBookingError(null); } }}
+            className="bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full max-w-md p-5 max-h-[90vh] overflow-y-auto"
+            style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}
+          >
+            <h2 id="guest-modal-title" className="text-lg font-bold text-gray-900">Guest details</h2>
             <p className="text-sm text-gray-500 mt-1 break-words">
               Holding <span className="font-medium text-indigo-600">{guestModalListing.title}</span> for your dates.
             </p>
@@ -359,7 +366,7 @@ export default function Home() {
                 />
               </div>
               {bookingError && (
-                <p className="text-sm text-red-600">{bookingError}</p>
+                <p role="alert" className="text-sm text-red-600">{bookingError}</p>
               )}
             </div>
             <div className="mt-5 flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
@@ -387,6 +394,7 @@ export default function Home() {
       {/* Chat Button — clear of home indicator / edges */}
       <button
         onClick={() => setChatOpen(true)}
+        style={{ marginBottom: 'env(safe-area-inset-bottom)' }}
         className="fixed bottom-5 right-4 sm:bottom-6 sm:right-6 bg-indigo-600 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg hover:bg-indigo-700 transition-colors z-50 text-2xl touch-manipulation"
         aria-label="Open chat assistant"
       >

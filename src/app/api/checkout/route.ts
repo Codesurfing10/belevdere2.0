@@ -3,7 +3,9 @@ import { prisma } from '@/lib/prisma';
 import Stripe from 'stripe';
 import { isDemoMode, isPlaceholderStripeKey, PAYMENTS_NOT_CONFIGURED } from '@/lib/payments';
 import { ownsBooking } from '@/lib/security';
-import { captureError } from '@/lib/monitoring';
+import { serverError } from '@/lib/http';
+import { isHoldExpired } from '@/lib/booking';
+import { toCents } from '@/lib/money';
 
 
 export async function POST(req: NextRequest) {
@@ -26,6 +28,13 @@ export async function POST(req: NextRequest) {
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   if (order.status === 'paid') {
     return NextResponse.json({ success: true, alreadyPaid: true, orderId: order.id, bookingId });
+  }
+
+  if (order.booking.status !== 'hold' || isHoldExpired(order.booking)) {
+    return NextResponse.json(
+      { error: 'This hold has expired or is no longer payable. Please place a new hold.', code: 'HOLD_EXPIRED' },
+      { status: 409 }
+    );
   }
 
   // Explicit opt-in only: DEMO_MODE=true marks paid without charging (public demo).
@@ -64,7 +73,7 @@ export async function POST(req: NextRequest) {
       apiVersion: '2023-10-16' as const,
     });
 
-    const amountCents = Math.round(order.total * 100);
+    const amountCents = toCents(order.total);
 
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amountCents,
@@ -74,6 +83,9 @@ export async function POST(req: NextRequest) {
         orderId: order.id,
       },
       description: `Booking: ${order.booking.listing.title}`,
+    }, {
+      // Retries for the same order + amount reuse the same PaymentIntent.
+      idempotencyKey: `checkout_${order.id}_${amountCents}`,
     });
 
     await prisma.order.update({
@@ -90,8 +102,6 @@ export async function POST(req: NextRequest) {
       message: 'PaymentIntent created. Complete payment with Stripe on the client.',
     });
   } catch (err: unknown) {
-    await captureError(err, { route: 'checkout', bookingId });
-    const message = err instanceof Error ? err.message : 'Stripe checkout failed';
-    return NextResponse.json({ error: message, success: false }, { status: 500 });
+    return serverError('checkout', err, { bookingId });
   }
 }
